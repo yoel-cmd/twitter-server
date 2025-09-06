@@ -1,0 +1,10 @@
+# לא מעלים ספריות ענקיות
+node_modules
+
+# לא מעלים סודות
+.env
+
+# לוגים ושטויות זמניות
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
