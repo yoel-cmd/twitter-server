@@ -1,0 +1,28 @@
+{
+  "name": "twitetr-server",
+  "version": "1.0.0",
+  "description": "Twitter clone server",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yoel-cmd/twitter-server.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/yoel-cmd/twitter-server/issues"
+  },
+  "homepage": "https://github.com/yoel-cmd/twitter-server#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.2",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

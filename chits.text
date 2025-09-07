@@ -1,0 +1,286 @@
+פקודות ליצירת התקיות
+cd C:\repo\twitetr-server
+mkdir src
+cd src
+mkdir config routes controllers services repositories middlewares models utils
+type NUL > app.js
+
+
+פקודות התקנה
+cd C:\repo\twitetr-server
+npm install express cors bcrypt jsonwebtoken dotenv @supabase/supabase-js
+mpn i-y
+
+
+
+
+curl -X POST http://localhost:3000/api/tweets \
+  -H "Content-Type: application/json" \
+  -d '{"text":"שלום עולם","author":"yoel"}'
+
+
+שליפת כל הציוצים
+curl http://localhost:3000/api/tweets
+
+
+שליפה לפי id
+curl http://localhost:3000/api/tweets/1694000000000
+
+curl -X PUT http://localhost:3000/api/tweets/1694000000000 \
+  -H "Content-Type: application/json" \
+  -d '{"text":"עודכן! זה הציוץ החדש"}'
+
+מחיקה
+curl -X DELETE http://localhost:3000/api/tweets/1694000000000
+--------------------------------------------------------
+יצירת יוזר
+curl -X POST http://localhost:3000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"username":"yoel","role":"user"}'
+
+שליפת כל המשתמשים
+curl http://localhost:3000/api/users
+
+
+----------------------------------------
+יצרה עם AUTH
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"yoel","password":"1234","role":"user"}'
+
+LOGIN
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"yoel","password":"1234"}'
+
+
+--------------------------------------DB---------------------
+יצירת הטבלאות 
+-- USERS: בלי אימייל, עם bcrypt hash ו-role
+create table public.users (
+  id uuid primary key default gen_random_uuid(),
+  username text unique not null,
+  password_hash text not null,
+  role text not null default 'user',
+  created_at timestamp with time zone default now()
+);
+
+create index users_username_idx on public.users (username);
+
+-- TWEETS: ציוצים שייכים ל-user
+create table public.tweets (
+  id uuid primary key default gen_random_uuid(),
+  author_id uuid not null references public.users(id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 500),
+  created_at timestamp with time zone default now()
+);
+
+create index tweets_author_created_idx on public.tweets (author_id, created_at desc);
+
+-- FOLLOWS: מי עוקב אחרי מי (טבלת גשר)
+create table public.follows (
+  follower_id uuid not null references public.users(id) on delete cascade,
+  followed_id uuid not null references public.users(id) on delete cascade,
+  created_at timestamp with time zone default now(),
+  primary key (follower_id, followed_id),
+  check (follower_id <> followed_id)
+);
+
+create index follows_followed_idx on public.follows (followed_id);
+
+הסבר
+🧑‍💻 users (משתמשים)
+
+הטבלה הבסיסית ביותר – כל מי שנרשם לאתר.
+
+id – מזהה ייחודי (UUID).
+
+username – שם המשתמש (ייחודי).
+
+password_hash – הסיסמה אחרי שעברה bcrypt. לא מאחסנים סיסמאות גולמיות.
+
+role – למשל user או admin (מאפשר RBAC).
+
+created_at – מתי נוצר המשתמש.
+
+👉 הטבלה הזאת מחזיקה את כל החשבונות שלנו. היא “אבא” לכל השאר.
+
+🐦 tweets (ציוצים)
+
+כאן נשמרים כל הפוסטים (ציוצים) של המשתמשים.
+
+id – מזהה ייחודי לציוץ.
+
+author_id – קישור (FK) ל־users.id, מי כתב את הציוץ.
+
+body – הטקסט של הציוץ (עם מגבלת אורך, נגיד עד 500 תווים).
+
+created_at – מתי נכתב הציוץ.
+
+👉 לכל משתמש יכולים להיות כמה ציוצים. הקשר הוא: User אחד → הרבה Tweets.
+
+🔗 follows (עוקבים)
+
+טבלת גשר (bridge table) – מחברת בין משתמש לעוקבים שלו.
+
+follower_id – מי עוקב (FK ל־users.id).
+
+followed_id – אחרי מי הוא עוקב (גם FK ל־users.id).
+
+created_at – מתי התחיל המעקב.
+
+primary key (follower_id, followed_id) – לא יכול להיות כפל רשומות.
+
+check (follower_id <> followed_id) – אי אפשר לעקוב אחרי עצמך.
+
+👉 בזכות הטבלה הזאת אפשר לבנות “פיד”: כשמשתמש נכנס, שולפים את כל ה־tweets של האנשים שהוא עוקב אחריהם.
+
+איך זה מתחבר?
+
+users ← (1→N) ← tweets
+משתמש כותב הרבה ציוצים.
+
+users ← (N→N) → users דרך follows
+משתמש אחד יכול לעקוב אחרי הרבה אחרים, ולהיפך.
+
+למה שלושת אלה מספיקים ל־MVP?
+
+כי איתם יש לנו:
+
+מערכת משתמשים עם הרשאות.
+
+יכולת לצייץ ולשלוף ציוצים.
+
+יכולת להציג פיד אישי לפי העוקבים.
+
+-----------------------------פקודות לבדיקה---------------------------------
+
+1. רישום משתמש חדש
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"yoel","password":"1234","role":"admin"}'
+
+
+📌 הפלט יחזיר לך JSON עם user ו־accessToken. שמור את ה־accessToken.
+
+🔑 2. התחברות
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"yoel","password":"1234"}'
+
+
+גם כאן תקבל accessToken.
+
+שמור אותו במשתנה:
+
+TOKEN=PASTE_YOUR_ACCESS_TOKEN_HERE
+
+🐦 3. יצירת ציוץ
+curl -X POST http://localhost:3000/api/tweets \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"text":"שלום טוויטר מסופאבייס!"}'
+
+📖 4. שליפת כל הציוצים
+curl http://localhost:3000/api/tweets
+
+✏️ 5. עדכון ציוץ (החלף TWEET_ID ב־UUID שהתקבל ביצירה)
+curl -X PUT http://localhost:3000/api/tweets/TWEET_ID \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"text":"עודכן מסופאבייס"}'
+
+❌ 6. מחיקת ציוץ (דורש role=admin)
+curl -X DELETE http://localhost:3000/api/tweets/TWEET_ID \
+  -H "Authorization: Bearer $TOKEN"
+
+📰 7. פיד (ציוצים של מי שאתה עוקב אחריו)
+curl http://localhost:3000/api/tweets/feed \
+  -H "Authorization: Bearer $TOKEN"
+
+  ---------------------------פקודות-------
+  התחברות של יואל → שמירת טוקן במשתנה
+TOKEN_YOEL=$(curl -s -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"yoel","password":"1234"}' \
+  | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+
+echo "YOEL token: ${TOKEN_YOEL:0:25}..."
+
+2) התחברות של אליס → שמירת טוקן ו־ID
+LOGIN_ALICE=$(curl -s -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"1234"}')
+
+TOKEN_ALICE=$(echo "$LOGIN_ALICE" | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+ALICE_ID=$(echo "$LOGIN_ALICE" | sed -n 's/.*"user":{[^}]*"id":"\([^"]*\)".*/\1/p')
+
+echo "ALICE_ID: $ALICE_ID"
+echo "ALICE token: ${TOKEN_ALICE:0:25}..."
+
+3) בדיקה מהירה
+echo $TOKEN_YOEL
+echo $TOKEN_ALICE
+echo $ALICE_ID
+
+
+אם אחד מהם ריק → משהו לא נתפס ב־sed. במקרה כזה אפשר פשוט להעתיק ידנית מה־JSON שחזר מה־login.
+
+4) עכשיו יואל עוקב אחרי אליס
+curl -i -X POST http://localhost:3000/api/follows/$ALICE_ID \
+  -H "Authorization: Bearer $TOKEN_YOEL"
+
+
+נוודא שיואל באמת עוקב
+curl -s -H "Authorization: Bearer $TOKEN_YOEL" \
+  http://localhost:3000/api/follows/me
+
+
+מצופה: { "following": ["<ALICE_ID>"] }.
+
+2) אליס מצייצת משהו לפיד
+TWEET_ALICE=$(curl -s -X POST http://localhost:3000/api/tweets \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN_ALICE" \
+  -d '{"text":"היי, זה ציוץ של אליס לפיד של יואל"}')
+
+echo "$TWEET_ALICE"
+
+
+(אם צריך את ה־ID:
+ALICE_TWEET_ID=$(echo "$TWEET_ALICE" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p'))
+
+3) יואל פותח את הפיד שלו
+curl -s -H "Authorization: Bearer $TOKEN_YOEL" \
+  http://localhost:3000/api/tweets/feed
+
+
+מצופה: מערך עם הציוץ של אליס בראש. אם יצא ריק—אתה לא עוקב, או שאליס עוד לא צייצה. אתה כבר עוקב, אז זה אומר אליס לא צייצה → תחזור לשלב 2.
+
+4) בדיקת הרשאות בעלות (שנבין שזה נעול כמו שצריך)
+
+ננסה עם יואל לעדכן ציוץ של אליס—אמור ליפול 403 (אלא אם יואל אדמין):
+
+curl -i -X PUT http://localhost:3000/api/tweets/$ALICE_TWEET_ID \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN_YOEL" \
+  -d '{"text":"אני יואל ומנסה לערוך ציוץ של אליס"}'
+
+
+ועכשיו כאליס—צריך לעבוד:
+
+curl -i -X PUT http://localhost:3000/api/tweets/$ALICE_TWEET_ID \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN_ALICE" \
+  -d '{"text":"עודכן ע\"י אליס"}'
+
+
+מחיקה (אותו רעיון):
+
+# ייפול עם יואל (אם לא אדמין)
+curl -i -X DELETE http://localhost:3000/api/tweets/$ALICE_TWEET_ID \
+  -H "Authorization: Bearer $TOKEN_YOEL"
+
+# יעבוד עם אליס
+curl -i -X DELETE http://localhost:3000/api/tweets/$ALICE_TWEET_ID \
+  -H "Authorization: Bearer $TOKEN_ALICE"
